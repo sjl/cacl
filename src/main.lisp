@@ -8,6 +8,7 @@
 (defvar *running* nil)
 (defvar *stack* nil)
 (defvar *previous* nil)
+(defvar *commands* nil)
 
 
 ;;;; Stack --------------------------------------------------------------------
@@ -92,6 +93,56 @@
   (sh '("pbcopy") (structural-string object)))
 
 
+;;;; Help ---------------------------------------------------------------------
+(defun first-letter (command)
+  (let ((ch (aref (symbol-name command) 0)))
+    (if (alphanumericp ch)
+      ch
+      #\!)))
+
+(defun partition-commands (commands)
+  (mapcar (lambda (letter-and-commands)
+            (sort (second letter-and-commands) #'string<))
+          (sort (hash-table-contents (group-by #'first-letter commands))
+                #'char< :key #'first)))
+
+(defun print-version ()
+  (format t "CACL v0.0.0 (~A)~%"
+          #+sbcl 'sbcl
+          #+ccl 'ccl
+          #+ecl 'ecl
+          #+abcl 'abcl))
+
+(defun print-help ()
+  (terpri)
+  (format t "CACL is an RPN calculator written in Common Lisp.~@
+          ~@
+          The current stack is displayed above the prompt (the top is at the right).~@
+          ~@
+          Forms are read from standard input with the standard Common Lisp READ function.~@
+          This means you can put multiple things on one line if you want, like this:~@
+          ~%    1 2 +~@
+          ~@
+          What happens when a form is read depends on the form:~@
+          ~@
+          * Numbers are pushed onto the stack.~@
+          * Symbols run commands.~@
+          * Quoted forms are pushed onto the stack.~@
+          ~@
+          Type `commands` for a list of available commands.~@
+          ~@
+          To get help for a particular command, push its symbol onto the stack~@
+          and run the `doc` command:~@
+          ~%    'float doc~@
+          "))
+
+(defun print-commands ()
+  (terpri)
+  (format t "AVAILABLE COMMANDS:~@
+             ~(~{~{~A~^ ~}~%~}~)~%"
+          (partition-commands *commands*)))
+
+
 ;;;; Commands -----------------------------------------------------------------
 (defgeneric command (symbol))
 
@@ -99,11 +150,35 @@
   (error "Unknown command ~S" symbol))
 
 
+(defgeneric command-documentation (symbol))
+
+(defmethod command-documentation (object)
+  (flet ((friendly-type (object)
+           (let ((type (type-of object)))
+             (if (consp type) (first type) type))))
+    (error "Cannot retrieve documentation for ~S ~S"
+           (friendly-type object) object)))
+
+(defmethod command-documentation ((symbol symbol))
+  (error "Unknown command ~S" symbol))
+
+
+(defmacro define-command% (symbol args &body body)
+  (multiple-value-bind (forms declarations documentation)
+      (parse-body body :documentation t)
+    `(progn
+       (defmethod command ((symbol (eql ',symbol)))
+         (with-args ,args
+           ,@declarations
+           ,@forms))
+       (defmethod command-documentation ((symbol (eql ',symbol)))
+         ,(or documentation "No documentation provided"))
+       (pushnew ',symbol *commands*))))
+
 (defmacro define-command (symbol-or-symbols args &body body)
-  `(progn ,@(iterate (for symbol :in (ensure-list symbol-or-symbols))
-                     (collect `(defmethod command ((symbol (eql ',symbol)))
-                                 (with-args ,args
-                                   ,@body))))))
+  `(progn ,@(iterate
+              (for symbol :in (ensure-list symbol-or-symbols))
+              (collect `(define-command% ,symbol ,args ,@body)))))
 
 (defmacro define-simple-command
     (symbols argument-count &optional (lisp-function (first symbols)))
@@ -119,7 +194,6 @@
 (define-constant-command e (exp 1.0d0))
 (define-constant-command pi pi)
 (define-constant-command tau tau)
-
 
 (define-simple-command (!) 1 factorial)
 (define-simple-command (*) 2)
@@ -153,12 +227,13 @@
 (define-simple-command (tan) 1)
 (define-simple-command (truncate trunc tr) 1 truncate)
 
-(define-command (float fl) (x)
-  (push! (coerce x 'double-float)))
+
 (define-command (clear cl) ()
+  "Clear the entire stack."
   (pop-all!))
 
 (define-command (float fl) (x)
+  "Coerce the top of the stack to a DOUBLE-FLOAT."
   (push! (coerce x 'double-float)))
 
 (define-command range (from below)
@@ -168,37 +243,52 @@
   (map nil #'push! (range from (1+ to))))
 
 (define-command pbc (x)
+  "Copy the top element of the stack to the system clipboard.
+
+  SBCL only for now, sorry."
   (pbcopy x)
   (push! x))
 
 (define-command sum ()
+  "Pop the entire stack, add everything together, and push the result."
   (push! (summation (pop-all!))))
 
 (define-command prod ()
+  "Pop the entire stack, multiply everything together, and push the result."
   (push! (product (pop-all!))))
 
 (define-command dup (x)
+  "Duplicate the top element of the stack."
   (push! x x))
 
 (define-command log (base number)
   (push! (log number base)))
 
+(define-command nop ()
+  "Do nothing.")
+
 (define-command pop ()
+  "Pop the top element of the stack."
   (pop!))
 
 (define-command version ()
+  "Print the version and host Lisp."
   (print-version))
 
 (define-command (quit q) ()
+  "Quit CACL."
   (setf *running* nil))
 
 (define-command (swap sw) (x y)
+  "Swap the top two elements of the stack."
   (push! y x))
 
 (define-command reload ()
+  "Reload the entire CACL system from Quicklisp."
   (funcall (read-from-string "ql:quickload") :cacl))
 
 (define-command (reverse rev) ()
+  "Reverse the stack."
   (setf *stack* (reverse *stack*)))
 
 (define-command (hist history) ()
@@ -215,10 +305,34 @@
   (throw :do-not-add-undo-state nil))
 
 (define-command count ()
+  "Push the length of the stack."
   (push! (length *stack*)))
 
+(define-command doc (symbol)
+  "Print the documentation for the symbol at the top of the stack."
+  (format t "~A: ~A~%" symbol (command-documentation symbol)))
+
+(define-command help ()
+  "Print some basic help information."
+  (print-help))
+
+
+(define-command commands ()
+  "Print a list of available commands."
+  (print-commands))
+
 (define-command base (n)
-  ;; todo figure out how the christ to undo this
+  "Set the print base and read base for numbers to the top element of the stack.
+
+  For example, to switch to reading and displaying numbers in binary:
+
+    2 base
+
+  To switch back to base 10 you can run the command again, but you'll need to
+  write the 10 in the base you've chosen!  It's often easer to `undo`, or use
+  the provided `base10` command.
+
+  "
   (let ((pb *print-base*)
         (rb *read-base*))
     (save-thunk (lambda ()
@@ -226,6 +340,16 @@
                         *read-base* rb))))
   (setf *print-base* n
         *read-base* n))
+
+(define-command base10 ()
+  "Set the print base and read base for numbers to base 10."
+  (let ((pb *print-base*)
+        (rb *read-base*))
+    (save-thunk (lambda ()
+                  (setf *print-base* pb
+                        *read-base* rb))))
+  (setf *print-base* 10
+        *read-base* 10))
 
 
 ;;;; Special Forms ------------------------------------------------------------
@@ -278,13 +402,6 @@
 (defun print-prompt ()
   (princ "? ")
   (force-output))
-
-(defun print-version ()
-  (format t "CACL v0.0.0 (~A)~%"
-          #+sbcl 'sbcl
-          #+ccl 'ccl
-          #+ecl 'ecl
-          #+abcl 'abcl))
 
 
 (defun run ()

@@ -2,7 +2,7 @@
 ;;;; See http://quickutil.org for details.
 
 ;;;; To regenerate:
-;;;; (qtlc:save-utils-as "quickutils.lisp" :utilities '(:COMPOSE :CURRY :ONCE-ONLY :WITH-GENSYMS :RCURRY :MAKE-GENSYM-LIST :ENSURE-LIST :RANGE) :ensure-package T :package "CACL.QUICKUTILS")
+;;;; (qtlc:save-utils-as "quickutils.lisp" :utilities '(:COMPOSE :CURRY :ENSURE-LIST :MAKE-GENSYM-LIST :ONCE-ONLY :PARSE-BODY :RANGE :RCURRY :WITH-GENSYMS) :ensure-package T :package "CACL.QUICKUTILS")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (unless (find-package "CACL.QUICKUTILS")
@@ -14,9 +14,9 @@
 
 (when (boundp '*utilities*)
   (setf *utilities* (union *utilities* '(:MAKE-GENSYM-LIST :ENSURE-FUNCTION
-                                         :COMPOSE :CURRY :ONCE-ONLY
-                                         :STRING-DESIGNATOR :WITH-GENSYMS
-                                         :RCURRY :ENSURE-LIST :RANGE))))
+                                         :COMPOSE :CURRY :ENSURE-LIST
+                                         :ONCE-ONLY :PARSE-BODY :RANGE :RCURRY
+                                         :STRING-DESIGNATOR :WITH-GENSYMS))))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-gensym-list (length &optional (x "G"))
     "Returns a list of `length` gensyms, each generated as if with a call to `make-gensym`,
@@ -90,6 +90,13 @@ it is called with to `function`."
            (apply ,fun ,@curries more)))))
   
 
+  (defun ensure-list (list)
+    "If `list` is a list, it is returned. Otherwise returns the list designated by `list`."
+    (if (listp list)
+        list
+        (list list)))
+  
+
   (defmacro once-only (specs &body forms)
     "Evaluates `forms` with symbols specified in `specs` rebound to temporary
 variables, ensuring that each initform is evaluated only once.
@@ -127,6 +134,46 @@ Example:
             ,(let ,(mapcar (lambda (n g) (list (car n) g))
                     names-and-forms gensyms)
                ,@forms)))))
+  
+
+  (defun parse-body (body &key documentation whole)
+    "Parses `body` into `(values remaining-forms declarations doc-string)`.
+Documentation strings are recognized only if `documentation` is true.
+Syntax errors in body are signalled and `whole` is used in the signal
+arguments when given."
+    (let ((doc nil)
+          (decls nil)
+          (current nil))
+      (tagbody
+       :declarations
+         (setf current (car body))
+         (when (and documentation (stringp current) (cdr body))
+           (if doc
+               (error "Too many documentation strings in ~S." (or whole body))
+               (setf doc (pop body)))
+           (go :declarations))
+         (when (and (listp current) (eql (first current) 'declare))
+           (push (pop body) decls)
+           (go :declarations)))
+      (values body (nreverse decls) doc)))
+  
+
+  (defun range (start end &key (step 1) (key 'identity))
+    "Return the list of numbers `n` such that `start <= n < end` and
+`n = start + k*step` for suitable integers `k`. If a function `key` is
+provided, then apply it to each number."
+    (assert (<= start end))
+    (loop :for i :from start :below end :by step :collecting (funcall key i)))
+  
+
+  (defun rcurry (function &rest arguments)
+    "Returns a function that applies the arguments it is called
+with and `arguments` to `function`."
+    (declare (optimize (speed 3) (safety 1) (debug 1)))
+    (let ((fn (ensure-function function)))
+      (lambda (&rest more)
+        (declare (dynamic-extent more))
+        (multiple-value-call fn (values-list more) (values-list arguments)))))
   
 
   (deftype string-designator ()
@@ -172,33 +219,8 @@ The string-designator is used as the argument to `gensym` when constructing the
 unique symbol the named variable will be bound to."
     `(with-gensyms ,names ,@forms))
   
-
-  (defun rcurry (function &rest arguments)
-    "Returns a function that applies the arguments it is called
-with and `arguments` to `function`."
-    (declare (optimize (speed 3) (safety 1) (debug 1)))
-    (let ((fn (ensure-function function)))
-      (lambda (&rest more)
-        (declare (dynamic-extent more))
-        (multiple-value-call fn (values-list more) (values-list arguments)))))
-  
-
-  (defun ensure-list (list)
-    "If `list` is a list, it is returned. Otherwise returns the list designated by `list`."
-    (if (listp list)
-        list
-        (list list)))
-  
-
-  (defun range (start end &key (step 1) (key 'identity))
-    "Return the list of numbers `n` such that `start <= n < end` and
-`n = start + k*step` for suitable integers `k`. If a function `key` is
-provided, then apply it to each number."
-    (assert (<= start end))
-    (loop :for i :from start :below end :by step :collecting (funcall key i)))
-  
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (export '(compose curry once-only with-gensyms with-unique-names rcurry
-            make-gensym-list ensure-list range)))
+  (export '(compose curry ensure-list make-gensym-list once-only parse-body
+            range rcurry with-gensyms with-unique-names)))
 
 ;;;; END OF quickutils.lisp ;;;;
