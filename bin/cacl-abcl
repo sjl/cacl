@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+rlwrap abcl-raw --eval '(progn (ql:quickload :cacl))' --eval '(cacl:toplevel)' --eval '(exit)'
