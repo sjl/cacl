@@ -32,6 +32,12 @@
                     (collect `(,symbol (pop!)))))
      ,@body))
 
+(defmacro with-read-only-args (symbols &body body)
+  `(let (,@(iterate (for i :from 0)
+                    (for symbol :in (reverse symbols))
+                    (collect `(,symbol (nth ,i *stack*)))))
+     ,@body))
+
 
 ;;;; Undo ---------------------------------------------------------------------
 (defun save-stack ()
@@ -55,42 +61,18 @@
     (setf *stack* (car *previous*))))
 
 
-;;;; Math ---------------------------------------------------------------------
-(defun cube (number) (* number number number))
-
-(defun factorial (number)
-  (iterate (for i :from 1 :to number)
-           (multiplying i)))
-
-(defun binomial-coefficient (n k)
-  "Return `n` choose `k`."
-  ;; See https://en.wikipedia.org/wiki/Binomial_coefficient#Multiplicative_formula
-  (iterate (for i :from 1 :to k)
-           (multiplying (/ (- (1+ n) i) i))))
-
-
 ;;;; Misc ---------------------------------------------------------------------
-(defun sh (command input)
-  (declare (ignorable command input))
-  #+sbcl
-  (sb-ext:run-program (first command) (rest command)
-                      :search t
-                      :input (make-string-input-stream input))
-  #+ccl
-  (ccl:run-program (first command) (rest command)
-                   :input (make-string-input-stream input))
-  #+abcl
-  (let ((p (system:run-program (first command) (rest command)
-                               :input :stream
-                               :output t
-                               :wait nil)))
-    (write-string input (system:process-input p))
-    (close (system:process-input p)))
-  #-(or sbcl ccl abcl)
-  (error "Not implemented for this Lisp implementation, sorry"))
+(defun sh (command &key (input "") output)
+  (uiop:run-program command
+                    :output (when output :string)
+                    :input (make-string-input-stream input)))
 
 (defun pbcopy (object)
-  (sh '("pbcopy") (structural-string object)))
+  (sh '("pbcopy") :input (aesthetic-string object))
+  (values))
+
+(defun pbpaste ()
+  (values (sh '("pbpaste") :output t)))
 
 
 ;;;; Help ---------------------------------------------------------------------
@@ -163,12 +145,12 @@
   (error "Unknown command ~S" symbol))
 
 
-(defmacro define-command% (symbol args &body body)
+(defmacro define-command% (symbol args read-only &body body)
   (multiple-value-bind (forms declarations documentation)
       (parse-body body :documentation t)
     `(progn
        (defmethod command ((symbol (eql ',symbol)))
-         (with-args ,args
+         (,(if read-only 'with-read-only-args 'with-args) ,args
            ,@declarations
            ,@forms))
        (defmethod command-documentation ((symbol (eql ',symbol)))
@@ -176,9 +158,11 @@
        (pushnew ',symbol *commands*))))
 
 (defmacro define-command (symbol-or-symbols args &body body)
-  `(progn ,@(iterate
-              (for symbol :in (ensure-list symbol-or-symbols))
-              (collect `(define-command% ,symbol ,args ,@body)))))
+  (let ((read-only (member '&read-only args))
+        (args (remove '&read-only args)))
+    `(progn ,@(iterate
+                (for symbol :in (ensure-list symbol-or-symbols))
+                (collect `(define-command% ,symbol ,args ,read-only ,@body))))))
 
 (defmacro define-simple-command
     (symbols argument-count &optional (lisp-function (first symbols)))
@@ -191,101 +175,65 @@
      (push! ,value)))
 
 
-(define-constant-command e (exp 1.0d0))
-(define-constant-command pi pi)
-(define-constant-command tau tau)
+;;;; Commands/IO --------------------------------------------------------------
+(define-command pbc (&read-only x)
+  "Copy the top element of the stack to the system clipboard.
 
-(define-simple-command (!) 1 factorial)
-(define-simple-command (*) 2)
-(define-simple-command (+) 2)
-(define-simple-command (-) 2)
-(define-simple-command (/) 2)
-(define-simple-command (abs) 1)
-(define-simple-command (acos) 1)
-(define-simple-command (asin) 1)
-(define-simple-command (atan) 1)
-(define-simple-command (atan2) 2 atan)
-(define-simple-command (ceiling ceil) 1)
-(define-simple-command (choose) 2 binomial-coefficient)
-(define-simple-command (cos) 1)
-(define-simple-command (cs) 1 -)
-(define-simple-command (cube) 1)
-(define-simple-command (denom) 1 denominator)
-(define-simple-command (expt ex) 2)
-(define-simple-command (floor) 1)
-(define-simple-command (gcd) 2)
-(define-simple-command (lcm) 2)
-(define-simple-command (mod) 2)
-(define-simple-command (numer) 1 numerator)
-(define-simple-command (rat) 1 rationalize)
-(define-simple-command (rec recip) 1 /)
-(define-simple-command (rem) 2)
-(define-simple-command (round) 1)
-(define-simple-command (sin) 1)
-(define-simple-command (sqrt) 1)
-(define-simple-command (square sq) 1)
-(define-simple-command (tan) 1)
-(define-simple-command (truncate trunc tr) 1 truncate)
+  The item will remain on the stack.
+
+  "
+  (pbcopy x))
+
+(define-command pbp ()
+  "Push the contents of the system clipboard onto the stack as a string."
+  (push! (pbpaste)))
+
+(define-command file (path)
+  "Push the contents of `path` onto the stack as a string."
+  (push! (read-file-into-string path)))
+
+(defun curl% (url)
+  (let ((body (drakma:http-request url)))
+    (etypecase body
+      (string body)
+      (vector (flexi-streams:octets-to-string body)))))
+
+(define-command curl (url)
+  "Retrieve `url` and push its contents onto the stack as a string."
+  (push! (curl% url)))
 
 
+;;;; Commands/Stack -----------------------------------------------------------
 (define-command (clear cl) ()
   "Clear the entire stack."
   (pop-all!))
 
-(define-command (float fl) (x)
-  "Coerce the top of the stack to a DOUBLE-FLOAT."
-  (push! (coerce x 'double-float)))
+(define-command (print p) (&read-only item)
+  "Print `item`.  It will remain on the stack."
+  (princ (structural-string item))
+  (terpri)
+  (force-output))
 
-(define-command range (from below)
-  (map nil #'push! (range from below)))
+(define-command (pprint pp) (&read-only item)
+  "Pretty print `item`.  It will remain on the stack."
+  (pprint item)
+  (terpri)
+  (force-output))
 
-(define-command irange (from to)
-  (map nil #'push! (range from (1+ to))))
-
-(define-command pbc (x)
-  "Copy the top element of the stack to the system clipboard.
-
-  SBCL only for now, sorry."
-  (pbcopy x)
-  (push! x))
-
-(define-command sum ()
-  "Pop the entire stack, add everything together, and push the result."
-  (push! (summation (pop-all!))))
-
-(define-command prod ()
-  "Pop the entire stack, multiply everything together, and push the result."
-  (push! (product (pop-all!))))
-
-(define-command dup (x)
+(define-command (dup d) (x)
   "Duplicate the top element of the stack."
   (push! x x))
-
-(define-command log (base number)
-  (push! (log number base)))
-
-(define-command nop ()
-  "Do nothing.")
 
 (define-command pop ()
   "Pop the top element of the stack."
   (pop!))
 
-(define-command version ()
-  "Print the version and host Lisp."
-  (print-version))
+(define-command (length len) (item)
+  (push! (length item)))
 
-(define-command (quit q) ()
-  "Quit CACL."
-  (setf *running* nil))
-
-(define-command (swap sw) (x y)
-  "Swap the top two elements of the stack."
+(define-command (swap x) (x y)
+  "Exchange the top two elements of the stack."
   (push! y x))
-
-(define-command reload ()
-  "Reload the entire CACL system from Quicklisp."
-  (funcall (read-from-string "ql:quickload") :cacl))
 
 (define-command (reverse rev) ()
   "Reverse the stack."
@@ -295,19 +243,21 @@
   (let ((*read-default-float-format* 'double-float))
     (flet ((print-entry (e)
              (typecase e
-               (list (print (reverse e)))
-               (t (print e)))))
+               (list (print-stack e))
+               (t (prin1 e) (terpri)))))
       (mapc #'print-entry (reverse *previous*))))
   (terpri))
-
-(define-command (undo un) ()
-  (undo)
-  (throw :do-not-add-undo-state nil))
 
 (define-command count ()
   "Push the length of the stack."
   (push! (length *stack*)))
 
+(define-command (undo un) ()
+  (undo)
+  (throw :do-not-add-undo-state nil))
+
+
+;;;; Commands/System ----------------------------------------------------------
 (define-command doc (symbol)
   "Print the documentation for the symbol at the top of the stack."
   (format t "~A: ~A~%" symbol (command-documentation symbol)))
@@ -316,40 +266,24 @@
   "Print some basic help information."
   (print-help))
 
-
 (define-command commands ()
   "Print a list of available commands."
   (print-commands))
 
-(define-command base (n)
-  "Set the print base and read base for numbers to the top element of the stack.
+(define-command reload ()
+  "Reload the entire CACL system from Quicklisp."
+  (funcall (read-from-string "ql:quickload") :cacl))
 
-  For example, to switch to reading and displaying numbers in binary:
+(define-command (quit q) ()
+  "Quit CACL."
+  (setf *running* nil))
 
-    2 base
+(define-command version ()
+  "Print the version and host Lisp."
+  (print-version))
 
-  To switch back to base 10 you can run the command again, but you'll need to
-  write the 10 in the base you've chosen!  It's often easer to `undo`, or use
-  the provided `base10` command.
-
-  "
-  (let ((pb *print-base*)
-        (rb *read-base*))
-    (save-thunk (lambda ()
-                  (setf *print-base* pb
-                        *read-base* rb))))
-  (setf *print-base* n
-        *read-base* n))
-
-(define-command base10 ()
-  "Set the print base and read base for numbers to base 10."
-  (let ((pb *print-base*)
-        (rb *read-base*))
-    (save-thunk (lambda ()
-                  (setf *print-base* pb
-                        *read-base* rb))))
-  (setf *print-base* 10
-        *read-base* 10))
+(define-command nop ()
+  "Do nothing.")
 
 
 ;;;; Special Forms ------------------------------------------------------------
@@ -386,7 +320,7 @@
   (with-errors-handled
     (catch :do-not-add-undo-state
       (etypecase input
-        (number (push! input))
+        ((or number string) (push! input))
         (symbol (command input))
         (cons (apply 'special-form input)))
       (save-stack))))
@@ -395,9 +329,36 @@
   (mapc #'handle-input (read-input)))
 
 
-(defun print-stack ()
+(defun render-stack-item (object)
+  (typecase object
+    (string (structural-string (str:prune 20 object :ellipsis "…")))
+    (t (write-to-string object :pretty t :lines 1 :level 2 :right-margin 20 :length 20))))
+
+;; (defgeneric render-stack-item (object))
+
+;; (defmethod render-stack-item ((object t))
+;;   (princ-to-string object))
+
+;; (defmethod render-stack-item ((string string))
+;;   (-<> string
+;;     (str:replace-all (string #\newline) "⏎ " <>)
+;;     (str:prune 15 <> :ellipsis "…")
+;;     structural-string))
+
+;; (defmethod render-stack-item ((hash-table hash-table))
+;;   "{…}")
+
+;; (defmethod render-stack-item ((array array))
+;;   "#(…)")
+
+
+(defun print-stack (&optional (stack *stack*))
+  (write-char #\()
   (let ((*read-default-float-format* 'double-float))
-    (pr (reverse *stack*))))
+    (format t "~{~A~^ ~}" (mapcar #'render-stack-item (reverse stack))))
+  (write-char #\))
+  (terpri)
+  (force-output))
 
 (defun print-prompt ()
   (princ "? ")

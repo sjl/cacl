@@ -6,7 +6,11 @@
   :version "0.0.1"
 
   :depends-on (:losh
-               :iterate)
+               :drakma
+               :flexi-streams
+               :iterate
+               :str
+               :yason)
 
   :serial t
   :components ((:module "vendor" :serial t
@@ -14,4 +18,6 @@
                              (:file "quickutils")))
                (:file "package")
                (:module "src" :serial t
-                :components ((:file "main")))))
+                :components ((:file "base")
+                             (:file "json")
+                             (:file "math")))))

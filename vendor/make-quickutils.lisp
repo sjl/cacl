@@ -12,6 +12,7 @@
                :parse-body
                :range
                :rcurry
+               :read-file-into-string
                :with-gensyms
 
 
