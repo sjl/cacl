@@ -379,5 +379,7 @@
   (values))
 
 (defun toplevel ()
+  ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
+  (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
   (print-version)
   (run))
