@@ -1,21 +1,22 @@
 (in-package :cacl)
 
-(defun string-to-json (string)
+(defun decode-json% (string)
   (let ((yason:*parse-json-booleans-as-symbols* t)
         (yason:*parse-json-arrays-as-vectors* t))
     (yason:parse string)))
 
-(defun json-to-string (json &key indent)
+(defun encode-json% (json &key indent)
   (with-output-to-string (s)
     (yason:encode json (if indent (yason:make-json-output-stream s) s))))
 
 
-(define-command (from-json fj) (string)
+(define-command (decode-json dj) (string)
   (etypecase string
-    (string (push! (string-to-json string)))))
+    (string (push! (decode-json% string)))))
 
-(define-command (to-json tj) (json)
-  (etypecase json
-    (json (push! (json-to-string json)))))
+(define-command (encode-json ej) (object)
+  (etypecase object
+    ((or hash-table vector null number (member yason:true yason:false) string)
+     (push! (encode-json% object)))))
 
 
