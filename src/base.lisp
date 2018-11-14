@@ -74,6 +74,21 @@
 (defun pbpaste ()
   (values (sh '("pbpaste") :output t)))
 
+(defgeneric ref% (object key))
+
+(defmethod ref% ((object hash-table) key)
+  (gethash key object))
+
+(defmethod ref% ((object vector) key)
+  (aref object key))
+
+(defun ref (object &rest keys)
+  (recursively ((object object)
+                (keys keys))
+    (if (null keys)
+      object
+      (recur (ref% object (first keys)) (rest keys)))))
+
 
 ;;;; Help ---------------------------------------------------------------------
 (defun first-letter (command)
@@ -255,6 +270,11 @@
 (define-command (undo un) ()
   (undo)
   (throw :do-not-add-undo-state nil))
+
+
+;;;; Commands/Objects ---------------------------------------------------------
+(define-command ref (object key)
+  (push! (ref object key)))
 
 
 ;;;; Commands/System ----------------------------------------------------------
