@@ -449,7 +449,7 @@
   (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
     (when (gethash 'help options)
       (adopt:print-usage *ui*)
-      (sb-ext:exit :code 0))
+      (adopt:exit 0))
     (when (gethash 'inform options)
       (print-version))
     (when-let ((rc (gethash 'rcfile options)))
