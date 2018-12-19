@@ -398,8 +398,64 @@
                (handle-all-input))))
   (values))
 
+
+;;;; Command Line -------------------------------------------------------------
+(adopt:define-interface *ui*
+  "[OPTIONS] [VALUES...]"
+  (format nil "CACL is a TUI RPN calculator written (and configurable) in Common Lisp.~@
+    ~@
+    Documentation about the command-line options to the CACL binary follows.  ~
+    For information about how to use CACL itself type help when running in interactive mode.")
+
+  ((help) "display help and exit"
+   :long "help"
+   :short #\h
+   :reduce (constantly t))
+
+  ((rcfile) "path to the custom initialization file (default ~/.caclrc)"
+   :long "rcfile"
+   :parameter "PATH"
+   :initial-value "~/.caclrc"
+   :reduce #'adopt:newest)
+
+  ((rcfile no-rcfile) "disable loading of any rcfile"
+   :long "no-rcfile"
+   :reduce (constantly nil))
+
+  ((interactive mode) "run in interactive mode (the default)"
+   :long "interactive"
+   :short #\i
+   :initial-value 'interactive
+   :reduce (constantly 'interactive))
+
+  ((batch mode) "run in batch processing mode"
+   :long "batch"
+   :short #\b
+   :reduce (constantly 'batch))
+
+  ((inform) "print informational message at startup (the default)"
+   :long "inform"
+   :initial-value t
+   :reduce (constantly t))
+
+  ((no-inform inform) "suppress printing of informational message at startup"
+   :long "no-inform"
+   :reduce (constantly nil)))
+
+
 (defun toplevel ()
   ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
   (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
-  (print-version)
-  (run))
+  (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
+    (when (gethash 'help options)
+      (adopt:print-usage *ui*)
+      (sb-ext:exit :code 0))
+    (when (gethash 'inform options)
+      (print-version))
+    (when-let ((rc (gethash 'rcfile options)))
+      (load rc :if-does-not-exist nil))
+    (when arguments
+      (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments))
+    (run)))
+
+

@@ -5,7 +5,8 @@
   :license "MIT/X11"
   :version "0.0.1"
 
-  :depends-on (:losh
+  :depends-on (:adopt
+               :losh
                :drakma
                :flexi-streams
                :iterate
