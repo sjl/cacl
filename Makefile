@@ -1,6 +1,6 @@
-.PHONY: vendor binaries
+.PHONY: all vendor
 
-all: vendor binaries
+all: vendor build/cacl-sbcl build/cacl-ccl build/cacl-abcl build/cacl-ecl build/cacl.1
 
 # Vendor ----------------------------------------------------------------------
 vendor/quickutils.lisp: vendor/make-quickutils.lisp
@@ -11,18 +11,21 @@ vendor: vendor/quickutils.lisp
 # Build -----------------------------------------------------------------------
 lisps := $(shell ffind '\.(asd|lisp)$$')
 
-binaries: cacl-sbcl cacl-ccl cacl-ecl cacl-abcl
+build:
+	mkdir -p build
 
-cacl-sbcl: $(lisps)
-	sbcl --load "src/build.lisp"
-	mv cacl cacl-sbcl
+build/cacl-sbcl: build $(lisps)
+	sbcl --load "src/build-binary.lisp"
 
-cacl-ccl: $(lisps)
-	ccl --load "src/build.lisp"
-	mv cacl cacl-ccl
+build/cacl-ccl: build $(lisps) bin/cacl-ccl
+	ccl --load "src/build-binary.lisp"
+	cp bin/cacl-ccl build/
 
-cacl-ecl: $(lisps) bin/cacl-ecl
-	cp bin/cacl-ecl cacl-ecl
+build/cacl-ecl: build $(lisps) bin/cacl-ecl
+	cp bin/cacl-ecl build/
 
-cacl-abcl: $(lisps) bin/cacl-abcl
-	cp bin/cacl-abcl cacl-abcl
+build/cacl-abcl: build $(lisps) bin/cacl-abcl
+	cp bin/cacl-abcl build/
+
+build/cacl.1: build $(lisps)
+	sbcl --load "src/build-manual.lisp" --quit

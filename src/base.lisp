@@ -400,45 +400,57 @@
 
 
 ;;;; Command Line -------------------------------------------------------------
-(adopt:define-interface *ui*
-  "[OPTIONS] [VALUES...]"
-  (format nil "CACL is a TUI RPN calculator written (and configurable) in Common Lisp.~@
-    ~@
-    Documentation about the command-line options to the CACL binary follows.  ~
-    For information about how to use CACL itself type help when running in interactive mode.")
+(adopt:define-string *documentation*
+  "CACL is a TUI RPN calculator.~@
+  ~@
+  Documentation about the command-line options to the CACL binary follows.  ~
+  For information about how to use CACL itself type help when running in interactive mode.")
 
-  ((help) "display help and exit"
+(adopt:define-interface *ui*
+    (:name "cacl"
+     :usage "[OPTIONS]"
+     :summary "A TUI RPN calculator written and customizable in Common Lisp."
+     :documentation *documentation*)
+
+  ((help)
+   :documentation "display help and exit"
    :long "help"
    :short #\h
    :reduce (constantly t))
 
-  ((rcfile) "path to the custom initialization file (default ~/.caclrc)"
+  ((rcfile)
+   :documentation "path to the custom initialization file (default ~/.caclrc)"
    :long "rcfile"
    :parameter "PATH"
    :initial-value "~/.caclrc"
    :reduce #'adopt:newest)
 
-  ((rcfile no-rcfile) "disable loading of any rcfile"
+  ((rcfile no-rcfile)
+   :documentation "disable loading of any rcfile"
    :long "no-rcfile"
    :reduce (constantly nil))
 
-  ((interactive mode) "run in interactive mode (the default)"
+  ((interactive mode)
+   :documentation "run in interactive mode (the default)"
    :long "interactive"
    :short #\i
    :initial-value 'interactive
    :reduce (constantly 'interactive))
 
-  ((batch mode) "run in batch processing mode"
+  ((batch mode)
+   :documentation "run in batch processing mode"
    :long "batch"
    :short #\b
    :reduce (constantly 'batch))
 
-  ((inform) "print informational message at startup (the default)"
+  ((inform)
+   :documentation "print informational message at startup (the default)"
    :long "inform"
    :initial-value t
    :reduce (constantly t))
 
-  ((no-inform inform) "suppress printing of informational message at startup"
+  ((no-inform inform)
+   :documentation "suppress printing of informational message at startup"
    :long "no-inform"
    :reduce (constantly nil)))
 

@@ -13,7 +13,7 @@
 (progn
   (sb-ext:gc :full t)
   (sb-ext:save-lisp-and-die
-    "cacl"
+    "build/cacl-sbcl"
     :executable t
     :compression nil
     :toplevel #'cacl:toplevel
@@ -23,7 +23,6 @@
 (progn
   (ccl:gc)
   (ccl:save-application
-    "cacl"
+    "build/cacl-ccl.image"
     :toplevel-function #'cacl:toplevel
-    :purify t
-    :prepend-kernel t))
+    :purify t))
