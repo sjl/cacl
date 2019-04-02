@@ -406,68 +406,88 @@
   Documentation about the command-line options to the CACL binary follows.  ~
   For information about how to use CACL itself type help when running in interactive mode.")
 
-(adopt:define-interface *ui*
-    (:name "cacl"
+(defparameter *o-help*
+  (adopt:make-option 'help
+    :help "display help and exit"
+    :long "help"
+    :short #\h
+    :reduce (constantly t)))
+
+(defparameter *o-rcfile*
+  (adopt:make-option 'rcfile
+    :help "path to the custom initialization file (default ~/.caclrc)"
+    :long "rcfile"
+    :parameter "PATH"
+    :initial-value "~/.caclrc"
+    :reduce #'adopt:newest))
+
+(defparameter *o-no-rcfile*
+  (adopt:make-option 'no-rcfile
+    :result-key 'rcfile
+    :help "disable loading of any rcfile"
+    :long "no-rcfile"
+    :reduce (constantly nil)))
+
+(defparameter *o-interactive*
+  (adopt:make-option 'interactive
+    :result-key 'mode
+    :help "run in interactive mode (the default)"
+    :long "interactive"
+    :short #\i
+    :initial-value 'interactive
+    :reduce (constantly 'interactive)))
+
+(defparameter *o-batch*
+  (adopt:make-option 'batch
+    :result-key 'mode
+    :help "run in batch processing mode"
+    :long "batch"
+    :short #\b
+    :reduce (constantly 'batch)))
+
+(defparameter *o-inform*
+  (adopt:make-option 'inform
+    :help "print informational message at startup (the default)"
+    :long "inform"
+    :initial-value t
+    :reduce (constantly t)))
+
+(defparameter *o-no-inform*
+  (adopt:make-option 'no-inform
+    :result-key 'inform
+    :help "suppress printing of informational message at startup"
+    :long "no-inform"
+    :reduce (constantly nil)))
+
+
+ (defparameter *ui*
+   (adopt:make-interface
+     :name "cacl"
      :usage "[OPTIONS]"
      :summary "A TUI RPN calculator written and customizable in Common Lisp."
-     :documentation *documentation*)
-
-  ((help)
-   :documentation "display help and exit"
-   :long "help"
-   :short #\h
-   :reduce (constantly t))
-
-  ((rcfile)
-   :documentation "path to the custom initialization file (default ~/.caclrc)"
-   :long "rcfile"
-   :parameter "PATH"
-   :initial-value "~/.caclrc"
-   :reduce #'adopt:newest)
-
-  ((rcfile no-rcfile)
-   :documentation "disable loading of any rcfile"
-   :long "no-rcfile"
-   :reduce (constantly nil))
-
-  ((interactive mode)
-   :documentation "run in interactive mode (the default)"
-   :long "interactive"
-   :short #\i
-   :initial-value 'interactive
-   :reduce (constantly 'interactive))
-
-  ((batch mode)
-   :documentation "run in batch processing mode"
-   :long "batch"
-   :short #\b
-   :reduce (constantly 'batch))
-
-  ((inform)
-   :documentation "print informational message at startup (the default)"
-   :long "inform"
-   :initial-value t
-   :reduce (constantly t))
-
-  ((no-inform inform)
-   :documentation "suppress printing of informational message at startup"
-   :long "no-inform"
-   :reduce (constantly nil)))
+     :help *documentation*
+     :contents
+     (list *o-help*
+           *o-rcfile*
+           *o-no-rcfile*
+           *o-interactive*
+           *o-batch*
+           *o-inform*
+           *o-no-inform*)))
 
 
-(defun toplevel ()
-  ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
-  (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
-  (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
-    (when (gethash 'help options)
-      (adopt:print-usage *ui*)
-      (adopt:exit 0))
-    (when (gethash 'inform options)
-      (print-version))
-    (when-let ((rc (gethash 'rcfile options)))
-      (load rc :if-does-not-exist nil))
-    (when arguments
-      (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments))
-    (run)))
+ (defun toplevel ()
+   ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
+   (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
+   (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
+     (when (gethash 'help options)
+       (adopt:print-help-and-exit *ui*))
+     (when (gethash 'inform options)
+       (print-version))
+     (when-let ((rc (gethash 'rcfile options)))
+       (load rc :if-does-not-exist nil))
+     (when arguments
+       (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments))
+     (run)))
 
 
