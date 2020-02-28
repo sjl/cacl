@@ -21,7 +21,7 @@ build/cacl-ccl: build $(lisps) bin/cacl-ccl
 	ccl --load "src/build-binary.lisp"
 	cp bin/cacl-ccl build/
 
-build/cacl-ecl: build $(lisps) bin/cacl-ecl
+build/cacl-ecl: build $(lisps)
 	cp bin/cacl-ecl build/
 
 build/cacl-abcl: build $(lisps) bin/cacl-abcl

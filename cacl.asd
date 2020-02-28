@@ -11,6 +11,7 @@
                :flexi-streams
                :iterate
                :str
+               :uiop
                :yason)
 
   :serial t

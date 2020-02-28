@@ -1,4 +1,6 @@
-(ql:quickload :cacl)
+(require :asdf)
+(require :uiop)
+(asdf:load-system :cacl)
 
 ;; Run these generic functions once now so their bodies will get compiled at
 ;; build time, instead of delaying it until the first time the user runs
@@ -26,3 +28,9 @@
     "build/cacl-ccl.image"
     :toplevel-function #'cacl:toplevel
     :purify t))
+
+#+ecl
+(asdf:make-build :cacl
+                 :type :program
+                 :move-here #P"./"
+                 :epilogue-code '(cacl:toplevel))

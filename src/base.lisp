@@ -419,7 +419,7 @@
     :long "rcfile"
     :parameter "PATH"
     :initial-value "~/.caclrc"
-    :reduce #'adopt:newest))
+    :reduce #'adopt:last))
 
 (defparameter *o-no-rcfile*
   (adopt:make-option 'no-rcfile
