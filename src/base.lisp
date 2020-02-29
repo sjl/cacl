@@ -74,21 +74,6 @@
 (defun pbpaste ()
   (values (sh '("pbpaste") :output t)))
 
-(defgeneric ref% (object key))
-
-(defmethod ref% ((object hash-table) key)
-  (gethash key object))
-
-(defmethod ref% ((object vector) key)
-  (aref object key))
-
-(defun ref (object &rest keys)
-  (recursively ((object object)
-                (keys keys))
-    (if (null keys)
-      object
-      (recur (ref% object (first keys)) (rest keys)))))
-
 
 ;;;; Help ---------------------------------------------------------------------
 (defun first-letter (command)
@@ -162,7 +147,7 @@
 
 (defmacro define-command% (symbol args read-only &body body)
   (multiple-value-bind (forms declarations documentation)
-      (parse-body body :documentation t)
+      (alexandria:parse-body body :documentation t)
     `(progn
        (defmethod command ((symbol (eql ',symbol)))
          (,(if read-only 'with-read-only-args 'with-args) ,args
@@ -176,12 +161,12 @@
   (let ((read-only (member '&read-only args))
         (args (remove '&read-only args)))
     `(progn ,@(iterate
-                (for symbol :in (ensure-list symbol-or-symbols))
+                (for symbol :in (alexandria:ensure-list symbol-or-symbols))
                 (collect `(define-command% ,symbol ,args ,read-only ,@body))))))
 
 (defmacro define-simple-command
     (symbols argument-count &optional (lisp-function (first symbols)))
-  (let ((args (make-gensym-list argument-count "ARG")))
+  (let ((args (alexandria:make-gensym-list argument-count "ARG")))
     `(define-command ,symbols ,args
        (push! (,lisp-function ,@args)))))
 
@@ -202,20 +187,6 @@
 (define-command pbp ()
   "Push the contents of the system clipboard onto the stack as a string."
   (push! (pbpaste)))
-
-(define-command file (path)
-  "Push the contents of `path` onto the stack as a string."
-  (push! (read-file-into-string path)))
-
-(defun curl% (url)
-  (let ((body (drakma:http-request url)))
-    (etypecase body
-      (string body)
-      (vector (flexi-streams:octets-to-string body)))))
-
-(define-command curl (url)
-  "Retrieve `url` and push its contents onto the stack as a string."
-  (push! (curl% url)))
 
 
 ;;;; Commands/Stack -----------------------------------------------------------
@@ -272,11 +243,6 @@
   (throw :do-not-add-undo-state nil))
 
 
-;;;; Commands/Objects ---------------------------------------------------------
-(define-command ref (object key)
-  (push! (ref object key)))
-
-
 ;;;; Commands/System ----------------------------------------------------------
 (define-command doc (symbol)
   "Print the documentation for the symbol at the top of the stack."
@@ -321,7 +287,7 @@
 
 ;;;; REPL ---------------------------------------------------------------------
 (defmacro with-errors-handled (&body body)
-  (with-gensyms (old-stack)
+  (alexandria:with-gensyms (old-stack)
     `(let ((,old-stack *stack*))
        (handler-case (progn ,@body)
          (error (e)
@@ -349,33 +315,10 @@
   (mapc #'handle-input (read-input)))
 
 
-(defun render-stack-item (object)
-  (typecase object
-    (string (structural-string (str:prune 20 object :ellipsis "…")))
-    (t (write-to-string object :pretty t :lines 1 :level 2 :right-margin 20 :length 20))))
-
-;; (defgeneric render-stack-item (object))
-
-;; (defmethod render-stack-item ((object t))
-;;   (princ-to-string object))
-
-;; (defmethod render-stack-item ((string string))
-;;   (-<> string
-;;     (str:replace-all (string #\newline) "⏎ " <>)
-;;     (str:prune 15 <> :ellipsis "…")
-;;     structural-string))
-
-;; (defmethod render-stack-item ((hash-table hash-table))
-;;   "{…}")
-
-;; (defmethod render-stack-item ((array array))
-;;   "#(…)")
-
-
 (defun print-stack (&optional (stack *stack*))
   (write-char #\()
   (let ((*read-default-float-format* 'double-float))
-    (format t "~{~A~^ ~}" (mapcar #'render-stack-item (reverse stack))))
+    (format t "~{~A~^ ~}" (reverse stack)))
   (write-char #\))
   (terpri)
   (force-output))
@@ -460,7 +403,7 @@
     :reduce (constantly nil)))
 
 
- (defparameter *ui*
+(defparameter *ui*
    (adopt:make-interface
      :name "cacl"
      :usage "[OPTIONS]"
@@ -476,18 +419,18 @@
            *o-no-inform*)))
 
 
- (defun toplevel ()
-   ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
-   (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
-   (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
-     (when (gethash 'help options)
-       (adopt:print-help-and-exit *ui*))
-     (when (gethash 'inform options)
-       (print-version))
-     (when-let ((rc (gethash 'rcfile options)))
-       (load rc :if-does-not-exist nil))
-     (when arguments
-       (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments))
-     (run)))
+(defun toplevel ()
+  ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
+  (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
+  (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
+    (cond ((gethash 'help options)
+           (adopt:print-help-and-exit *ui*))
+          (arguments
+           (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments)))
+    (when (gethash 'inform options)
+      (print-version))
+    (when-let ((rc (gethash 'rcfile options)))
+      (load rc :if-does-not-exist nil))
+    (run)))
 
 

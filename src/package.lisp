@@ -1,3 +1,3 @@
 (defpackage :cacl
-  (:use :cl :cacl.quickutils :losh :iterate)
+  (:use :cl :losh :iterate)
   (:export :run :toplevel))

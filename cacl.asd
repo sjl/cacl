@@ -6,20 +6,15 @@
   :version "0.0.1"
 
   :depends-on (:adopt
+               :alexandria
                :losh
-               :drakma
-               :flexi-streams
                :iterate
                :str
-               :uiop
-               :yason)
+               :uiop)
 
   :serial t
-  :components ((:module "vendor" :serial t
-                :components ((:file "quickutils-package")
-                             (:file "quickutils")))
-               (:file "package")
+  :components (
                (:module "src" :serial t
-                :components ((:file "base")
-                             (:file "json")
+                :components ((:file "package")
+                             (:file "base")
                              (:file "math")))))

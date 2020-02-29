@@ -1,12 +1,6 @@
-.PHONY: all vendor
+.PHONY: all
 
-all: vendor build/cacl-sbcl build/cacl-ccl build/cacl-abcl build/cacl-ecl build/cacl.1
-
-# Vendor ----------------------------------------------------------------------
-vendor/quickutils.lisp: vendor/make-quickutils.lisp
-	cd vendor && sbcl --noinform --load make-quickutils.lisp  --eval '(quit)'
-
-vendor: vendor/quickutils.lisp
+all: build/cacl-sbcl build/cacl-ccl build/cacl-abcl build/cacl-ecl build/cacl.1
 
 # Build -----------------------------------------------------------------------
 lisps := $(shell ffind '\.(asd|lisp)$$')
