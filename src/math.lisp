@@ -54,11 +54,17 @@
   "Coerce the top of the stack to a DOUBLE-FLOAT."
   (push! (coerce x 'double-float)))
 
+(define-command 1in (p)
+  "Convert a probability to `1 in X` form and push `X`."
+  (let ((p (rationalize p)))
+    (push! (coerce (/ (denominator p) (numerator p))
+                   'double-float))))
+
 (define-command range (from below)
-  (map nil #'push! (range from below)))
+  (loop for x :from from :below below :do (push! x)))
 
 (define-command irange (from to)
-  (map nil #'push! (range from (1+ to))))
+  (loop for x :from from :to to :do (push! x)))
 
 (define-command base (n)
   "Set the print base and read base for numbers to the top element of the stack.
