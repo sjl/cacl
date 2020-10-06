@@ -86,6 +86,22 @@
   (setf *print-base* n
         *read-base* n))
 
+(define-command bits (x)
+  "Pop the top of the stack and print its binary representation."
+  (unless (typep x '(integer 0 *))
+    (error "BITS requires a nonnegative integer."))
+  (format t "~v,'0,' ,4:B~%"
+          (let ((chunks (ceiling (integer-length x) 4)))
+            (+ (* 4 chunks) ; actual bits
+               (1- chunks))) ; comma chars
+          x))
+
+(define-command hex (x)
+  "Pop the top of the stack and print its hex representation."
+  (unless (typep x '(integer 0 *))
+    (error "HEX requires a nonnegative integer."))
+  (format t "~X~%" x))
+
 (define-command base10 ()
   "Set the print base and read base for numbers to base 10."
   (let ((pb *print-base*)
