@@ -18,40 +18,40 @@
 (define-constant-command pi pi)
 (define-constant-command tau tau)
 
-(define-simple-command (!) 1 factorial)
-(define-simple-command (*) 2)
-(define-simple-command (+) 2)
-(define-simple-command (-) 2)
-(define-simple-command (/) 2)
-(define-simple-command (abs) 1)
-(define-simple-command (acos) 1)
-(define-simple-command (asin) 1)
-(define-simple-command (atan) 1)
-(define-simple-command (atan2) 2 atan)
-(define-simple-command (ceiling ceil) 1)
-(define-simple-command (choose) 2 binomial-coefficient)
-(define-simple-command (cos) 1)
-(define-simple-command (cs) 1 -)
-(define-simple-command (cube) 1)
-(define-simple-command (denom) 1 denominator)
-(define-simple-command (expt ex) 2)
-(define-simple-command (floor) 1)
-(define-simple-command (gcd) 2)
-(define-simple-command (lcm) 2)
-(define-simple-command (mod) 2)
-(define-simple-command (numer) 1 numerator)
-(define-simple-command (rat) 1 rationalize)
-(define-simple-command (rec recip) 1 /)
-(define-simple-command (rem) 2)
-(define-simple-command (round) 1)
-(define-simple-command (sin) 1)
-(define-simple-command (sqrt) 1)
-(define-simple-command (square sq) 1)
-(define-simple-command (tan) 1)
-(define-simple-command (truncate trunc tr) 1 truncate)
+(define-simple-command (!) (x) factorial)
+(define-simple-command (*) (x y))
+(define-simple-command (+) (x y))
+(define-simple-command (-) (x y))
+(define-simple-command (/) (x y))
+(define-simple-command (abs) (x))
+(define-simple-command (acos) (x))
+(define-simple-command (asin) (x))
+(define-simple-command (atan) (y))
+(define-simple-command (atan2) (y x) atan)
+(define-simple-command (ceiling ceil) (x))
+(define-simple-command (choose) (n k) binomial-coefficient)
+(define-simple-command (cos) (x))
+(define-simple-command (cs) (x) -)
+(define-simple-command (cube) (x))
+(define-simple-command (denom) (x) denominator)
+(define-simple-command (expt ex) (base power))
+(define-simple-command (floor) (x))
+(define-simple-command (gcd) (x y))
+(define-simple-command (lcm) (x y))
+(define-simple-command (mod) (x modulus))
+(define-simple-command (numer) (n) numerator)
+(define-simple-command (rat) (x) rationalize)
+(define-simple-command (rec recip) (x) /)
+(define-simple-command (rem) (x divisor))
+(define-simple-command (round) (x))
+(define-simple-command (sin) (x))
+(define-simple-command (sqrt) (x))
+(define-simple-command (square sq) (x))
+(define-simple-command (tan) (x))
+(define-simple-command (truncate trunc tr) (x) truncate)
 
-(define-command (float fl) (x)
-  "Coerce the top of the stack to a DOUBLE-FLOAT."
+(define-command (float fl f) (x)
+  "Coerce the top of the stack to a `double-float`."
   (push! (coerce x 'double-float)))
 
 (define-command 1in (p)
@@ -61,9 +61,11 @@
                    'double-float))))
 
 (define-command range (from below)
+  "Push an exclusive range of numbers.  The highest number will be at the top of the stack."
   (loop for x :from from :below below :do (push! x)))
 
 (define-command irange (from to)
+  "Push an inclusive range of numbers.  The highest number will be at the top of the stack."
   (loop for x :from from :to to :do (push! x)))
 
 (define-command base (n)
@@ -104,6 +106,32 @@
   "Pop the entire stack, multiply everything together, and push the result."
   (push! (product (pop-all!))))
 
-(define-command log (base number)
-  (push! (log number base)))
+(define-command log (base x)
+  (push! (log x base)))
 
+(define-command ln (x)
+  (push! (log x)))
+
+(define-command kb (bytes)
+  "Convert bytes to kilobytes."
+  (push! (coerce (/ bytes (expt 1024 1)) 'double-float)))
+
+(define-command mb (bytes)
+  "Convert bytes to megabytes."
+  (push! (coerce (/ bytes (expt 1024 2)) 'double-float)))
+
+(define-command gb (bytes)
+  "Convert bytes to gigabytes."
+  (push! (coerce (/ bytes (expt 1024 3)) 'double-float)))
+
+(define-command tb (bytes)
+  "Convert bytes to terabytes."
+  (push! (coerce (/ bytes (expt 1024 4)) 'double-float)))
+
+(define-command pb (bytes)
+  "Convert bytes to petabytes."
+  (push! (coerce (/ bytes (expt 1024 5)) 'double-float)))
+
+(define-command eb (bytes)
+  "Convert bytes to exabytes."
+  (push! (coerce (/ bytes (expt 1024 6)) 'double-float)))

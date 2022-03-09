@@ -151,10 +151,15 @@
     `(progn
        (defmethod command ((symbol (eql ',symbol)))
          (,(if read-only 'with-read-only-args 'with-args) ,args
-           ,@declarations
-           ,@forms))
+          ,@declarations
+          ,@forms))
        (defmethod command-documentation ((symbol (eql ',symbol)))
-         ,(or documentation "No documentation provided"))
+         (format nil "~A ~:S~A" ',symbol ',args
+                 ,(if documentation
+                    (format nil "~2%~A" (string-right-trim
+                                          #(#\newline #\space)
+                                          documentation))
+                    "")))
        (pushnew ',symbol *commands*))))
 
 (defmacro define-command (symbol-or-symbols args &body body)
@@ -164,28 +169,23 @@
                 (for symbol :in (alexandria:ensure-list symbol-or-symbols))
                 (collect `(define-command% ,symbol ,args ,read-only ,@body))))))
 
-(defmacro define-simple-command
-    (symbols argument-count &optional (lisp-function (first symbols)))
-  (let ((args (alexandria:make-gensym-list argument-count "ARG")))
-    `(define-command ,symbols ,args
-       (push! (,lisp-function ,@args)))))
+(defmacro define-simple-command (symbols args &optional (lisp-function (first symbols)))
+  `(define-command ,symbols ,args
+     (push! (,lisp-function ,@args))))
 
 (defmacro define-constant-command (symbol value)
   `(define-command ,symbol ()
+     ,(format nil "Push ~A (~A)." symbol (eval value))
      (push! ,value)))
 
 
 ;;;; Commands/IO --------------------------------------------------------------
 (define-command pbc (&read-only x)
-  "Copy the top element of the stack to the system clipboard.
-
-  The item will remain on the stack.
-
-  "
+  "Copy `x` to the system clipboard.  It will remain on the stack."
   (pbcopy x))
 
 (define-command pbp ()
-  "Push the contents of the system clipboard onto the stack as a string."
+  "Push the contents of the system clipboard as a string."
   (push! (pbpaste)))
 
 
@@ -207,7 +207,7 @@
   (force-output))
 
 (define-command (dup d) (x)
-  "Duplicate the top element of the stack."
+  "Duplicate `x`."
   (push! x x))
 
 (define-command pop ()
@@ -215,6 +215,7 @@
   (pop!))
 
 (define-command (length len) (item)
+  "Pop `item` and push its length."
   (push! (length item)))
 
 (define-command (swap x) (x y)
@@ -246,7 +247,7 @@
 ;;;; Commands/System ----------------------------------------------------------
 (define-command doc (symbol)
   "Print the documentation for the symbol at the top of the stack."
-  (format t "~A: ~A~%" symbol (command-documentation symbol)))
+  (write-line (command-documentation symbol)))
 
 (define-command help ()
   "Print some basic help information."
@@ -318,7 +319,7 @@
 (defun print-stack (&optional (stack *stack*))
   (write-char #\()
   (let ((*read-default-float-format* 'double-float))
-    (format t "~{~A~^ ~}" (reverse stack)))
+    (format t "~{~S~^ ~}" (reverse stack)))
   (write-char #\))
   (terpri)
   (force-output))
