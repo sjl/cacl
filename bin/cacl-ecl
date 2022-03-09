@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-ecl -eval '(progn (ql:quickload :cacl))' -eval '(cacl:toplevel)' -eval '(si:exit)'

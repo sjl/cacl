@@ -1,6 +1,6 @@
 .PHONY: all
 
-all: build/cacl-sbcl build/cacl-ccl build/cacl-abcl build/cacl-ecl build/cacl.1
+all: build/cacl-sbcl build/cacl-ccl build/cacl-abcl build/cacl.1
 
 # Build -----------------------------------------------------------------------
 lisps := $(shell ffind '\.(asd|lisp)$$')
@@ -14,9 +14,6 @@ build/cacl-sbcl: build $(lisps)
 build/cacl-ccl: build $(lisps) bin/cacl-ccl
 	ccl --load "src/build-binary.lisp"
 	cp bin/cacl-ccl build/
-
-build/cacl-ecl: build $(lisps)
-	cp bin/cacl-ecl build/
 
 build/cacl-abcl: build $(lisps) bin/cacl-abcl
 	cp bin/cacl-abcl build/

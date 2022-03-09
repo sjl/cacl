@@ -28,9 +28,3 @@
     "build/cacl-ccl.image"
     :toplevel-function #'cacl:toplevel
     :purify t))
-
-#+ecl
-(asdf:make-build :cacl
-                 :type :program
-                 :move-here #P"./"
-                 :epilogue-code '(cacl:toplevel))
