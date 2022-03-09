@@ -61,20 +61,6 @@
     (setf *stack* (car *previous*))))
 
 
-;;;; Misc ---------------------------------------------------------------------
-(defun sh (command &key (input "") output)
-  (uiop:run-program command
-                    :output (when output :string)
-                    :input (make-string-input-stream input)))
-
-(defun pbcopy (object)
-  (sh '("pbcopy") :input (aesthetic-string object))
-  (values))
-
-(defun pbpaste ()
-  (values (sh '("pbpaste") :output t)))
-
-
 ;;;; Help ---------------------------------------------------------------------
 (defun first-letter (command)
   (let ((ch (aref (symbol-name command) 0)))
@@ -107,7 +93,7 @@
           ~@
           What happens when a form is read depends on the form:~@
           ~@
-          * Numbers are pushed onto the stack.~@
+          * Numbers and characters are pushed onto the stack.~@
           * Symbols run commands.~@
           * Quoted forms are pushed onto the stack.~@
           ~@
@@ -273,6 +259,14 @@
   "Do nothing.")
 
 
+;;;; Commands/Misc ------------------------------------------------------------
+(define-command char-code (char)
+  (push! (char-code char)))
+
+(define-command code-char (code)
+  (push! (code-char code)))
+
+
 ;;;; Special Forms ------------------------------------------------------------
 (defgeneric special-form (symbol &rest body))
 
@@ -307,7 +301,7 @@
   (with-errors-handled
     (catch :do-not-add-undo-state
       (etypecase input
-        ((or number string) (push! input))
+        ((or number string character) (push! input))
         (symbol (command input))
         (cons (apply 'special-form input)))
       (save-stack))))
