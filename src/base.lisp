@@ -216,7 +216,7 @@
   (let ((*read-default-float-format* 'double-float))
     (flet ((print-entry (e)
              (typecase e
-               (list (print-stack e))
+               (list (print-stack :stack e))
                (t (prin1 e) (terpri)))))
       (mapc #'print-entry (reverse *previous*))))
   (terpri))
@@ -310,12 +310,14 @@
   (mapc #'handle-input (read-input)))
 
 
-(defun print-stack (&optional (stack *stack*))
-  (write-char #\()
+(defun print-stack (&key (stack *stack*) (decorated t))
+  (when decorated
+    (write-char #\())
   (let ((*read-default-float-format* 'double-float))
     (format t "~{~S~^ ~}" (reverse stack)))
-  (write-char #\))
-  (terpri)
+  (when decorated
+    (write-char #\))
+    (terpri))
   (force-output))
 
 (defun print-prompt ()
@@ -323,17 +325,20 @@
   (force-output))
 
 
-(defun run ()
+(defun run (&key (batch nil))
   (setf *running* t
         *stack* nil
         *previous* (list nil))
   (let ((*package* (find-package :cacl)))
     (iterate (while *running*)
              (progn
-               (terpri)
-               (print-stack)
-               (print-prompt)
-               (handle-all-input))))
+               (unless batch
+                 (terpri)
+                 (print-stack)
+                 (print-prompt))
+               (handle-all-input)))
+    (when batch
+      (print-stack :decorated nil)))
   (values))
 
 
@@ -368,20 +373,20 @@
 
 (defparameter *o-interactive*
   (adopt:make-option 'interactive
-    :result-key 'mode
+    :result-key 'batch
     :help "run in interactive mode (the default)"
     :long "interactive"
     :short #\i
-    :initial-value 'interactive
-    :reduce (constantly 'interactive)))
+    :initial-value nil
+    :reduce (constantly nil)))
 
 (defparameter *o-batch*
   (adopt:make-option 'batch
-    :result-key 'mode
+    :result-key 'batch
     :help "run in batch processing mode"
     :long "batch"
     :short #\b
-    :reduce (constantly 'batch)))
+    :reduce (constantly t)))
 
 (defparameter *o-inform*
   (adopt:make-option 'inform
@@ -414,18 +419,23 @@
            *o-no-inform*)))
 
 
+(defun input-source (arguments)
+  (if (null arguments)
+    *standard-input*
+    (make-string-input-stream (str:join #\space arguments))))
+
 (defun toplevel ()
   ;; ccl clobbers the pprint dispatch table when dumping an image, no idea why
   (set-pprint-dispatch 'hash-table 'losh:pretty-print-hash-table)
-  (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
-    (cond ((gethash 'help options)
-           (adopt:print-help-and-exit *ui*))
-          (arguments
-           (cerror "Ignore them" "Unrecognized command-line arguments: ~S" arguments)))
-    (when (gethash 'inform options)
-      (print-version))
-    (when-let ((rc (gethash 'rcfile options)))
-      (load rc :if-does-not-exist nil))
-    (run)))
+  (adopt::quit-on-ctrl-c ()
+    (multiple-value-bind (arguments options) (adopt:parse-options *ui*)
+      (when (gethash 'help options)
+        (adopt:print-help-and-exit *ui*))
+      (when (gethash 'inform options)
+        (print-version))
+      (when-let ((rc (gethash 'rcfile options)))
+        (load rc :if-does-not-exist nil))
+      (let ((*standard-input* (input-source arguments)))
+        (run :batch (gethash 'batch options))))))
 
 

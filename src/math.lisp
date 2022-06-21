@@ -41,7 +41,7 @@
 (define-simple-command (mod) (x modulus))
 (define-simple-command (numer) (n) numerator)
 (define-simple-command (rat) (x) rationalize)
-(define-simple-command (rec recip) (x) /)
+(define-simple-command (rec recip 1/) (x) /)
 (define-simple-command (rem) (x divisor))
 (define-simple-command (round) (x))
 (define-simple-command (sin) (x))
