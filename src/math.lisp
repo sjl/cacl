@@ -128,6 +128,11 @@
 (define-command ln (x)
   (push! (log x)))
 
+(define-command pm (x y)
+  "Push both results of x ± y."
+  (push! (- x y))
+  (push! (+ x y)))
+
 (define-command kb (bytes)
   "Convert bytes to kilobytes."
   (push! (coerce (/ bytes (expt 1024 1)) 'double-float)))
@@ -151,3 +156,27 @@
 (define-command eb (bytes)
   "Convert bytes to exabytes."
   (push! (coerce (/ bytes (expt 1024 6)) 'double-float)))
+
+(define-command kbb (bytes)
+  "Convert kilobytes to bytes."
+  (push! (* bytes (expt 1024 1))))
+
+(define-command mbb (bytes)
+  "Convert megabytes to bytes."
+  (push! (* bytes (expt 1024 2))))
+
+(define-command gbb (bytes)
+  "Convert gigabytes to bytes."
+  (push! (* bytes (expt 1024 3))))
+
+(define-command tbb (bytes)
+  "Convert terabytes to bytes."
+  (push! (* bytes (expt 1024 4))))
+
+(define-command pbb (bytes)
+  "Convert petabytes to bytes."
+  (push! (* bytes (expt 1024 5))))
+
+(define-command ebb (bytes)
+  "Convert exabytes to bytes."
+  (push! (* bytes (expt 1024 6))))
