@@ -426,10 +426,12 @@
 
 (define-command pf (x)
   "Print x as a nicely-formatted number."
-  (multiple-value-bind (ipart fpart) (ftruncate x)
-    (let ((ipart (round ipart))
-          (fpart (if (zerop fpart)
-                   ""
-                   (subseq (format nil "~F" (abs fpart)) 1))))
-      (format t "~:D~A" ipart fpart)))
+  (let ((sign (if (minusp x) "-" ""))
+        (x (abs x)))
+    (multiple-value-bind (ipart fpart) (ftruncate x)
+      (let ((ipart (round ipart))
+            (fpart (if (zerop fpart)
+                     ""
+                     (subseq (format nil "~F" fpart) 1))))
+        (format t "~A~:D~A" sign ipart fpart))))
   (values))
