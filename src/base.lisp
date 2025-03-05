@@ -24,7 +24,7 @@
   (pop *stack*))
 
 (defun pop-all! ()
-  (prog1 *stack* (setf *stack* nil)))
+  (prog1 (copy-list *stack*) (setf *stack* nil)))
 
 
 (defmacro with-args (symbols &body body)
@@ -290,9 +290,9 @@
            (setf *stack* ,old-stack))))))
 
 
-(defun read-input ()
+(defun read-input (stream)
   (let ((*read-default-float-format* 'double-float)
-        (line (read-line *standard-input* nil :eof nil)))
+        (line (read-line stream nil :eof nil)))
     (if (eq :eof line)
       (setf *running* nil)
       (read-all-from-string line))))
@@ -306,8 +306,8 @@
         (cons (apply 'special-form input)))
       (save-stack))))
 
-(defun handle-all-input ()
-  (mapc #'handle-input (read-input)))
+(defun handle-all-input (stream)
+  (mapc #'handle-input (read-input stream)))
 
 
 (defun print-stack (&key (stack *stack*) (decorated t))
@@ -325,18 +325,22 @@
   (force-output))
 
 
-(defun run (&key (batch nil))
+(defun run (&key input (batch nil) (slurp nil))
   (setf *running* t
         *stack* nil
         *previous* (list nil))
   (let ((*package* (find-package :cacl)))
+    (when slurp
+      (iterate (while *running*)
+               (handle-all-input slurp))
+      (setf *running* t))
     (iterate (while *running*)
              (progn
                (unless batch
                  (terpri)
                  (print-stack)
                  (print-prompt))
-               (handle-all-input)))
+               (handle-all-input input)))
     (when batch
       (print-stack :decorated nil)))
   (values))
@@ -376,7 +380,7 @@
     :result-key 'batch
     :help "run in interactive mode (the default)"
     :long "interactive"
-    :short #\i
+    :short #\B
     :initial-value nil
     :reduce (constantly nil)))
 
@@ -388,19 +392,28 @@
     :short #\b
     :reduce (constantly t)))
 
-(defparameter *o-inform*
-  (adopt:make-option 'inform
-    :help "print informational message at startup (the default)"
-    :long "inform"
-    :initial-value t
-    :reduce (constantly t)))
-
 (defparameter *o-no-inform*
   (adopt:make-option 'no-inform
     :result-key 'inform
     :help "suppress printing of informational message at startup"
     :long "no-inform"
+    :short #\i
     :reduce (constantly nil)))
+
+(defparameter *o-inform*
+  (adopt:make-option 'inform
+    :help "print informational message at startup (the default)"
+    :long "inform"
+    :initial-value t
+    :short #\I
+    :reduce (constantly t)))
+
+(adopt:defparameters (*o-slurp* *o-no-slurp*)
+  (adopt:make-boolean-options 'slurp
+    :help "slurp input from stdin before continuing to a REPL"
+    :help-no "don't slurp input from stdin (the default)"
+    :long "slurp"
+    :short #\s))
 
 
 (defparameter *ui*
@@ -413,10 +426,12 @@
      (list *o-help*
            *o-rcfile*
            *o-no-rcfile*
-           *o-interactive*
            *o-batch*
+           *o-interactive*
+           *o-no-inform*
            *o-inform*
-           *o-no-inform*)))
+           *o-slurp*
+           *o-no-slurp*)))
 
 
 (defun input-source (arguments)
@@ -435,7 +450,15 @@
         (print-version))
       (when-let ((rc (gethash 'rcfile options)))
         (load rc :if-does-not-exist nil))
-      (let ((*standard-input* (input-source arguments)))
-        (run :batch (gethash 'batch options))))))
+      (flet ((run% (slurp) ; todo this is gross 
+               (run :input (input-source arguments)
+                    :batch (gethash 'batch options)
+                    :slurp slurp)))
+        (if (gethash 'slurp options)
+          (with-open-file (human-input "/dev/tty" :direction :input)
+            (let ((slurp *standard-input*)
+                  (*standard-input* human-input))
+              (run% slurp)))
+          (run% nil))))))
 
 
