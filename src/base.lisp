@@ -196,6 +196,14 @@
   "Duplicate `x`."
   (push! x x))
 
+(define-command (over o) (&read-only x y)
+  "Duplicate `x` (skipping `y`)."
+  (push! x))
+
+(define-command (rot r) (x y z)
+  "Rotate `x y z` to `y z x`."
+  (push! y z x))
+
 (define-command pop ()
   "Pop the top element of the stack."
   (pop!))
